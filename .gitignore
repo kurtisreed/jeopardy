@@ -2,6 +2,9 @@
 Games/
 uploads/
 
+# Zip archives
+*.zip
+
 # System files
 .DS_Store
 Thumbs.db
