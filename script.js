@@ -10,7 +10,67 @@ const gameState = {
     { id: 'team4', name: 'Team 4', score: 0 },
   ],
   activeTeamCount: 3, // Will be set based on user selection
+  usedCells: [],      // Tracks which board cells have been answered
 };
+
+// Game State Persistence
+function saveGameState() {
+  const stateToSave = {
+    selectedFolderName,
+    teams: gameState.teams.map(t => ({ ...t })),
+    activeTeamCount: gameState.activeTeamCount,
+    usedCells: gameState.usedCells,
+    timestamp: Date.now(),
+  };
+  localStorage.setItem('jeopardyGameState', JSON.stringify(stateToSave));
+}
+
+function clearSavedGame() {
+  localStorage.removeItem('jeopardyGameState');
+  const banner = document.getElementById('resume-banner');
+  if (banner) banner.style.display = 'none';
+  document.getElementById('openingeditform').style.display = 'block';
+}
+
+function checkForSavedGame() {
+  const saved = localStorage.getItem('jeopardyGameState');
+  if (!saved) return;
+  try {
+    const state = JSON.parse(saved);
+    const banner = document.getElementById('resume-banner');
+    const info = document.getElementById('resume-info');
+    if (banner && info) {
+      const date = new Date(state.timestamp);
+      const teamSummary = state.teams.map(t => `${t.name}: ${t.score}`).join(' | ');
+      const usedCount = (state.usedCells || []).length;
+      info.textContent = `Game: ${state.selectedFolderName} — ${teamSummary} — ${usedCount} question(s) answered — Saved: ${date.toLocaleString()}`;
+      banner.style.display = 'block';
+      document.getElementById('openingeditform').style.display = 'none';
+    }
+  } catch (e) {
+    localStorage.removeItem('jeopardyGameState');
+  }
+}
+
+async function resumeGame() {
+  const saved = localStorage.getItem('jeopardyGameState');
+  if (!saved) return;
+  try {
+    const state = JSON.parse(saved);
+    selectedFolderName = state.selectedFolderName;
+    gameState.teams = state.teams;
+    gameState.activeTeamCount = state.activeTeamCount;
+    gameState.usedCells = state.usedCells || [];
+    document.getElementById('openingmodal').style.display = 'none';
+    await loadGameConfig(selectedFolderName);
+    generateBoard();
+    preloadImages(selectedFolderName);
+    updateTeamUI();
+  } catch (e) {
+    console.error('Failed to resume game:', e);
+    clearSavedGame();
+  }
+}
 
 // DOM Elements
 const slide = document.getElementById('image');
@@ -55,6 +115,7 @@ function handleOpeningFormSubmit(event) {
 
   // Trim the teams array to only include active teams
   gameState.teams = gameState.teams.slice(0, teamCount);
+  gameState.usedCells = []; // Reset used cells for new game
 
   console.log(`Game configured for ${teamCount} teams:`, gameState.teams);
 
@@ -79,6 +140,7 @@ function handleNewScoreFormSubmit(event) {
     }
   });
   updateTeamUI();
+  saveGameState();
 
   // Close the modal after updating
   document.getElementById('changescore').style.display = 'none';
@@ -244,6 +306,7 @@ function DDAnswer(isCorrect) {
             gameState.teams[dailyDoubleTeamIndex].score -= dailyDoubleBid;
         }
         updateTeamUI();
+        saveGameState();
     }
 
     // Reset daily double tracking variables
@@ -526,15 +589,25 @@ function generateLegacyBoard() {
       cellDiv.setAttribute('data-value', pointValue);
       cellDiv.textContent = pointValue;
 
+      const cellId = `cell-cat${colIndex + 1}-${pointValue}`;
+      cellDiv.id = cellId;
+      if (gameState.usedCells.includes(cellId)) {
+        cellDiv.classList.add('used');
+      }
+
       // Hardcoded DD location: Category 4, $400 (image 0037)
       if (colIndex === 3 && pointValue === 400) {
         cellDiv.onclick = function() {
           this.classList.add('used');
+          if (!gameState.usedCells.includes(cellId)) gameState.usedCells.push(cellId);
+          saveGameState();
           showDDSplash();
         };
       } else {
         cellDiv.onclick = function() {
           this.classList.add('used');
+          if (!gameState.usedCells.includes(cellId)) gameState.usedCells.push(cellId);
+          saveGameState();
           openModal(pointValue, questionImage, answerImage);
         };
       }
@@ -625,15 +698,25 @@ function generateBoard() {
       cellDiv.setAttribute('data-value', pointValue);
       cellDiv.textContent = pointValue;
 
+      const cellId = `cell-cat${category}-${pointValue}`;
+      cellDiv.id = cellId;
+      if (gameState.usedCells.includes(cellId)) {
+        cellDiv.classList.add('used');
+      }
+
       // Check if this is the Daily Double location
       if (category === ddCategory && pointValue === ddValue) {
         cellDiv.onclick = function() {
           this.classList.add('used');
+          if (!gameState.usedCells.includes(cellId)) gameState.usedCells.push(cellId);
+          saveGameState();
           showDDSplash();
         };
       } else {
         cellDiv.onclick = function() {
           this.classList.add('used');
+          if (!gameState.usedCells.includes(cellId)) gameState.usedCells.push(cellId);
+          saveGameState();
           openModal(pointValue, questionData.question, questionData.answer);
         };
       }
@@ -652,6 +735,7 @@ function startGame() {
   generateBoard();
 
   preloadImages(selectedFolderName);
+  saveGameState();
 }
 
 async function loadGameConfig(folderName) {
@@ -795,6 +879,7 @@ function addPoints(teamId, points) {
   if (team) {
     team.score += Number(points);
     updateTeamUI();
+    saveGameState();
   } else {
     console.error(`Team with ID ${teamId} not found.`);
   }
@@ -834,6 +919,7 @@ window.addEventListener('load', () => {
   loadSubfolders();
   openingModal();
   updateTeamUI();
+  checkForSavedGame();
 
   document.getElementById('uploadForm').addEventListener('submit', handleUploadFormSubmit);
 });

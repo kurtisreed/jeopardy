@@ -118,6 +118,19 @@
                 <div class="modal-header text-center">
                     <h1>Welcome to Jeopardy!</h1>
                 </div>
+                <!-- Resume Game Banner -->
+                <div id="resume-banner" style="display:none;" class="modal-body">
+                    <div class="form-section" style="background: rgba(255,184,0,0.1); border: 1px solid var(--jeopardy-gold); border-radius: 8px; padding: 1rem;">
+                        <h2 style="color: var(--jeopardy-gold);">Resume Previous Game?</h2>
+                        <p id="resume-info" style="color: var(--text-secondary); font-size: 0.9rem; margin: 0.5rem 0 1rem;"></p>
+                        <div style="display:flex; gap: 1rem;">
+                            <button type="button" class="btn btn-gold" onclick="resumeGame()">Resume Game</button>
+                            <button type="button" class="btn btn-secondary" onclick="clearSavedGame()">Start New Game</button>
+                        </div>
+                    </div>
+                    <hr style="margin: 1.5rem 0; border-color: var(--border-color); opacity: 0.4;">
+                </div>
+
                 <form id="openingeditform">
                     <div class="modal-body">
                         <div class="form-section">
