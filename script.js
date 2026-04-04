@@ -415,10 +415,113 @@ function points() {
   const fjConfig = gameConfig?.finalJeopardy || { categoryImage: '0051.jpg' };
   fjSlide.src = `./Games/${selectedFolderName}/${fjConfig.categoryImage}`;
   document.getElementById('fjmodal').style.display = 'none';
-  document.getElementById('changescore').style.display = 'block';
+  openFJScoring();
+}
 
-  // Generate score inputs with current scores
-  generateScoreInputs();
+const fjState = { correct: {} };
+
+function openFJScoring() {
+  const container = document.getElementById('fj-team-inputs');
+  container.innerHTML = '';
+
+  // Reset result state
+  gameState.teams.forEach(team => { fjState.correct[team.id] = null; });
+
+  gameState.teams.forEach(team => {
+    const card = document.createElement('div');
+    card.className = 'fj-team-card';
+    card.innerHTML = `
+      <div class="fj-team-header">
+        <span class="fj-team-name">${team.name} — ${team.score}</span>
+      </div>
+      <div class="fj-team-controls">
+        <div class="form-group" style="flex:1; margin-bottom:0;">
+          <label>Wager</label>
+          <input type="number" id="fj-wager-${team.id}" min="0" value="0" placeholder="Enter wager">
+        </div>
+        <div style="display:flex; flex-direction:column; gap:0.5rem; align-items:center;">
+          <label>Result</label>
+          <div style="display:flex; gap:0.5rem;">
+            <button type="button" class="btn fj-correct-btn" id="fj-correct-${team.id}" onclick="setFJResult('${team.id}', true)">Correct</button>
+            <button type="button" class="btn fj-incorrect-btn" id="fj-incorrect-${team.id}" onclick="setFJResult('${team.id}', false)">Wrong</button>
+          </div>
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+
+  document.getElementById('fj-wager-section').style.display = 'block';
+  document.getElementById('fj-results-section').style.display = 'none';
+  document.getElementById('fj-scoring-modal').style.display = 'block';
+}
+
+function setFJResult(teamId, isCorrect) {
+  fjState.correct[teamId] = isCorrect;
+  document.getElementById(`fj-correct-${teamId}`).classList.toggle('active-correct', isCorrect);
+  document.getElementById(`fj-incorrect-${teamId}`).classList.toggle('active-incorrect', !isCorrect);
+}
+
+function calculateFJResults() {
+  gameState.teams.forEach(team => {
+    const wager = Number(document.getElementById(`fj-wager-${team.id}`)?.value || 0);
+    const isCorrect = fjState.correct[team.id];
+    if (isCorrect === true)  team.score += wager;
+    if (isCorrect === false) team.score -= wager;
+  });
+  updateTeamUI();
+  saveGameState();
+  showFJWinner();
+}
+
+function showFJWinner() {
+  document.getElementById('fj-wager-section').style.display = 'none';
+  document.getElementById('fj-results-section').style.display = 'block';
+
+  const sorted = [...gameState.teams].sort((a, b) => b.score - a.score);
+  const winner = sorted[0];
+
+  document.getElementById('fj-winner-display').innerHTML = `
+    <div class="fj-winner-banner">
+      <div class="fj-winner-label">Winner!</div>
+      <div class="fj-winner-name">${winner.name}</div>
+      <div class="fj-winner-final-score">${winner.score} points</div>
+    </div>
+  `;
+
+  const medals = ['🥇', '🥈', '🥉', '4️⃣'];
+  document.getElementById('fj-final-standings').innerHTML = `
+    <h3 style="color:var(--text-secondary); margin-bottom:1rem; font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">Final Standings</h3>
+    ${sorted.map((team, i) => `
+      <div class="fj-standing-row ${i === 0 ? 'fj-standing-first' : ''}">
+        <span class="fj-standing-medal">${medals[i] || ''}</span>
+        <span class="fj-standing-name">${team.name}</span>
+        <span class="fj-standing-score">${team.score}</span>
+      </div>
+    `).join('')}
+  `;
+
+  launchConfetti();
+}
+
+function launchConfetti() {
+  const container = document.getElementById('fj-confetti-container');
+  container.innerHTML = '';
+  const colors = ['#FFCC00', '#060CE9', '#ff4757', '#00d4aa', '#ffffff', '#ffd700'];
+  for (let i = 0; i < 70; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    piece.style.cssText = `
+      left: ${Math.random() * 100}%;
+      background: ${colors[Math.floor(Math.random() * colors.length)]};
+      width: ${5 + Math.random() * 8}px;
+      height: ${5 + Math.random() * 10}px;
+      animation-delay: ${Math.random() * 2.5}s;
+      animation-duration: ${2 + Math.random() * 2.5}s;
+      border-radius: ${Math.random() > 0.5 ? '50%' : '2px'};
+    `;
+    container.appendChild(piece);
+  }
 }
 
 function openScoreModal() {

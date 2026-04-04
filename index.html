@@ -265,6 +265,36 @@
             </div>
         </div>
 
+        <!-- Final Jeopardy Scoring Modal -->
+        <div id="fj-scoring-modal" class="modal">
+            <div class="modal-content" style="max-width: 700px; position: relative;">
+                <button class="modal-close" onclick="document.getElementById('fj-scoring-modal').style.display='none'">&times;</button>
+
+                <!-- Step 1: Wagers & Results -->
+                <div id="fj-wager-section">
+                    <div class="modal-header">
+                        <h2 class="text-gold">Final Jeopardy — Results</h2>
+                    </div>
+                    <div class="modal-body" id="fj-team-inputs"></div>
+                    <div class="modal-footer">
+                        <button class="btn btn-gold btn-large" onclick="calculateFJResults()">Calculate Final Scores</button>
+                    </div>
+                </div>
+
+                <!-- Step 2: Winner Screen -->
+                <div id="fj-results-section" style="display:none;">
+                    <div id="fj-confetti-container"></div>
+                    <div class="modal-body" style="text-align:center; padding: 3rem 2rem; position:relative; z-index:1;">
+                        <div id="fj-winner-display"></div>
+                        <div id="fj-final-standings" style="margin-top: 2rem; max-width: 400px; margin-left: auto; margin-right: auto;"></div>
+                    </div>
+                    <div class="modal-footer" style="justify-content:center; position:relative; z-index:1;">
+                        <button class="btn btn-secondary" onclick="document.getElementById('fj-scoring-modal').style.display='none'">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <script src="script.js"></script>

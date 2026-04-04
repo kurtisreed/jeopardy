@@ -576,6 +576,149 @@ label {
 }
 
 /* ===================================
+   FINAL JEOPARDY SCORING
+   =================================== */
+
+.fj-team-card {
+  background: rgba(42, 47, 74, 0.5);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.fj-team-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 1rem;
+}
+
+.fj-team-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--jeopardy-gold);
+}
+
+
+.fj-team-controls {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-end;
+}
+
+.fj-correct-btn,
+.fj-incorrect-btn {
+  background: var(--input-bg);
+  color: var(--text-primary);
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+}
+
+.fj-correct-btn.active-correct {
+  background: var(--success);
+  color: var(--dark-bg);
+}
+
+.fj-incorrect-btn.active-incorrect {
+  background: var(--error);
+  color: white;
+}
+
+/* Winner Screen */
+#fj-confetti-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: 16px;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -20px;
+  border-radius: 2px;
+  animation: confettiFall linear infinite;
+}
+
+@keyframes confettiFall {
+  0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+
+.fj-winner-banner {
+  animation: winnerPulse 2s ease-in-out infinite;
+  margin-bottom: 1.5rem;
+}
+
+@keyframes winnerPulse {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.03); }
+}
+
+.fj-winner-label {
+  font-size: 1.25rem;
+  font-weight: 900;
+  letter-spacing: 6px;
+  color: var(--jeopardy-gold);
+  text-shadow: 0 0 30px rgba(255, 204, 0, 0.7);
+  text-transform: uppercase;
+}
+
+.fj-winner-name {
+  font-size: 3.5rem;
+  font-weight: 900;
+  color: var(--jeopardy-gold);
+  text-shadow: 0 0 40px rgba(255, 204, 0, 0.5);
+  margin: 0.5rem 0;
+  line-height: 1.1;
+}
+
+.fj-winner-final-score {
+  font-size: 2rem;
+  font-weight: 700;
+  color: white;
+}
+
+.fj-standing-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  background: rgba(42, 47, 74, 0.3);
+}
+
+.fj-standing-first {
+  background: rgba(255, 204, 0, 0.1);
+  border: 1px solid rgba(255, 204, 0, 0.3);
+}
+
+.fj-standing-medal {
+  font-size: 1.5rem;
+  width: 2rem;
+  text-align: center;
+}
+
+.fj-standing-name {
+  flex: 1;
+  font-weight: 600;
+  font-size: 1.1rem;
+  text-align: left;
+}
+
+.fj-standing-score {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: var(--jeopardy-gold);
+}
+
+/* ===================================
    RESPONSIVE
    =================================== */
 
