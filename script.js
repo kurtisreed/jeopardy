@@ -554,11 +554,15 @@ function updateTeamInputsVisibility() {
 
   const teamCount = Number(teamCountSelect.value);
 
-  // Show/hide the entire Step 3 section
+  const startBtn = document.getElementById('start-jeopardy-btn');
+
+  // Show/hide the entire Step 3 section and Start button
   if (teamCount > 0) {
     teamNamesSection.style.display = 'block';
+    if (startBtn) startBtn.classList.remove('hidden');
   } else {
     teamNamesSection.style.display = 'none';
+    if (startBtn) startBtn.classList.add('hidden');
     return;
   }
 
