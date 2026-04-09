@@ -194,15 +194,15 @@
                            style="color: var(--jeopardy-gold); text-decoration: underline;">
                             Google Slides template
                         </a>.
-                        Fill in every slide, save as PDF, then run <code style="background:rgba(255,255,255,0.1); padding: 0.1rem 0.4rem; border-radius:4px;">convert_pdf.py</code> to produce the ZIP file to upload here.
+                        Fill in every slide and save as PDF. The PDF will be converted to images automatically in your browser before uploading.
                     </p>
                 </div>
 
                 <form id="uploadForm" enctype="multipart/form-data">
                     <div class="modal-body">
                         <div class="form-group">
-                            <label for="pdf_file">Select ZIP File:</label>
-                            <input type="file" name="pdf_file" id="pdf_file" accept=".zip,application/zip" required>
+                            <label for="pdf_file">Select PDF File:</label>
+                            <input type="file" name="pdf_file" id="pdf_file" accept=".pdf,application/pdf" required>
                         </div>
 
                         <div class="form-group">
@@ -253,7 +253,10 @@
                         <!-- Loading Spinner -->
                         <div id="upload-spinner" class="spinner-container hidden">
                             <div class="spinner"></div>
-                            <p class="spinner-text">Processing PDF... This may take 1-2 minutes</p>
+                            <p class="spinner-text" id="upload-spinner-text">Processing...</p>
+                            <div id="upload-progress-bar-container" style="width:100%; background:var(--border-color); border-radius:8px; margin-top:0.75rem; display:none;">
+                                <div id="upload-progress-bar" style="height:8px; width:0%; background:var(--jeopardy-gold); border-radius:8px; transition:width 0.2s ease;"></div>
+                            </div>
                         </div>
                     </div>
 
@@ -297,6 +300,8 @@
 
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

@@ -921,54 +921,104 @@ async function loadSubfolders() {
   }
 }
 
-function handleUploadFormSubmit(event) {
+async function convertPdfToZip(pdfFile, onProgress) {
+  const PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const SCALE = 300 / 72; // 300 DPI
+  const EXPECTED_PAGES = 53;
+
+  pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+
+  const arrayBuffer = await pdfFile.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+  if (pdf.numPages !== EXPECTED_PAGES) {
+    throw new Error(`PDF has ${pdf.numPages} pages — expected ${EXPECTED_PAGES}. Please use the Jeopardy template with all slides filled in.`);
+  }
+
+  const zip = new JSZip();
+
+  for (let i = 1; i <= EXPECTED_PAGES; i++) {
+    onProgress(i, EXPECTED_PAGES);
+
+    const page = await pdf.getPage(i);
+    const viewport = page.getViewport({ scale: SCALE });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.90));
+    zip.file(`${String(i).padStart(4, '0')}.jpg`, await blob.arrayBuffer());
+
+    // Free canvas memory before next page
+    canvas.width = 0;
+    canvas.height = 0;
+  }
+
+  return zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+}
+
+async function handleUploadFormSubmit(event) {
   event.preventDefault();
-  const formData = new FormData(event.target);
 
   const statusDiv = document.getElementById('status');
   const spinner = document.getElementById('upload-spinner');
+  const spinnerText = document.getElementById('upload-spinner-text');
+  const progressBarContainer = document.getElementById('upload-progress-bar-container');
+  const progressBar = document.getElementById('upload-progress-bar');
   const uploadButton = document.querySelector('#uploadForm button[type="submit"]');
 
-  // Clear previous status and show spinner
   statusDiv.textContent = '';
   statusDiv.className = '';
   spinner.classList.remove('hidden');
+  if (uploadButton) uploadButton.disabled = true;
 
-  // Disable the upload button to prevent double-submission
-  if (uploadButton) {
-    uploadButton.disabled = true;
+  try {
+    const formData = new FormData(event.target);
+    const pdfFile = formData.get('pdf_file');
+
+    if (pdfFile.name.toLowerCase().endsWith('.pdf')) {
+      // Client-side PDF → ZIP conversion
+      spinnerText.textContent = 'Reading PDF...';
+      progressBarContainer.style.display = 'block';
+      progressBar.style.width = '0%';
+
+      const zipBlob = await convertPdfToZip(pdfFile, (page, total) => {
+        spinnerText.textContent = `Rendering page ${page} of ${total}...`;
+        progressBar.style.width = `${Math.round((page / total) * 90)}%`;
+      });
+
+      spinnerText.textContent = 'Uploading...';
+      progressBar.style.width = '95%';
+
+      formData.delete('pdf_file');
+      formData.append('pdf_file', zipBlob, pdfFile.name.replace(/\.pdf$/i, '.zip'));
+    } else {
+      spinnerText.textContent = 'Uploading...';
+    }
+
+    const response = await fetch('upload.php', { method: 'POST', body: formData });
+    if (!response.ok) throw new Error(`Server error: ${response.status}`);
+    const data = await response.text();
+
+    progressBar.style.width = '100%';
+    setTimeout(() => {
+      spinner.classList.add('hidden');
+      progressBarContainer.style.display = 'none';
+    }, 400);
+
+    statusDiv.innerHTML = data;
+    statusDiv.className = data.toLowerCase().includes('error') ? 'status-message error' : 'status-message success';
+  } catch (error) {
+    spinner.classList.add('hidden');
+    progressBarContainer.style.display = 'none';
+    statusDiv.textContent = `An error occurred: ${error.message}`;
+    statusDiv.className = 'status-message error';
+  } finally {
+    if (uploadButton) uploadButton.disabled = false;
   }
-
-  fetch('upload.php', {
-    method: 'POST',
-    body: formData,
-  })
-    .then((response) => {
-      if (!response.ok) throw new Error(`Status: ${response.status}`);
-      return response.text();
-    })
-    .then((data) => {
-      // Hide spinner and show success message
-      spinner.classList.add('hidden');
-      statusDiv.innerHTML = data;
-      statusDiv.className = 'status-message success';
-
-      // Re-enable upload button
-      if (uploadButton) {
-        uploadButton.disabled = false;
-      }
-    })
-    .catch((error) => {
-      // Hide spinner and show error message
-      spinner.classList.add('hidden');
-      statusDiv.textContent = `An error occurred: ${error.message}`;
-      statusDiv.className = 'status-message error';
-
-      // Re-enable upload button
-      if (uploadButton) {
-        uploadButton.disabled = false;
-      }
-    });
 }
 
 function returnToOpening() {
