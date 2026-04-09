@@ -968,7 +968,8 @@ async function handleUploadFormSubmit(event) {
   const spinnerText = document.getElementById('upload-spinner-text');
   const progressBarContainer = document.getElementById('upload-progress-bar-container');
   const progressBar = document.getElementById('upload-progress-bar');
-  const uploadButton = document.querySelector('#uploadForm button[type="submit"]');
+  const uploadButton = document.getElementById('upload-submit-btn');
+  const doneButton = document.getElementById('upload-done-btn');
 
   statusDiv.textContent = '';
   statusDiv.className = '';
@@ -1010,7 +1011,12 @@ async function handleUploadFormSubmit(event) {
     }, 400);
 
     statusDiv.innerHTML = data;
-    statusDiv.className = data.toLowerCase().includes('error') ? 'status-message error' : 'status-message success';
+    const isError = data.toLowerCase().includes('error');
+    statusDiv.className = isError ? 'status-message error' : 'status-message success';
+    if (!isError) {
+      if (uploadButton) uploadButton.classList.add('hidden');
+      if (doneButton) doneButton.classList.remove('hidden');
+    }
   } catch (error) {
     spinner.classList.add('hidden');
     progressBarContainer.style.display = 'none';
@@ -1025,6 +1031,11 @@ function returnToOpening() {
   loadSubfolders();
   document.getElementById('openingmodal').style.display = 'block';
   document.getElementById('uploadModal').style.display = 'none';
+  // Reset upload form button state for next use
+  const submitBtn = document.getElementById('upload-submit-btn');
+  const doneBtn = document.getElementById('upload-done-btn');
+  if (submitBtn) submitBtn.classList.remove('hidden');
+  if (doneBtn) doneBtn.classList.add('hidden');
 }
 
 function addPoints(teamId, points) {
