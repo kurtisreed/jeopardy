@@ -128,26 +128,14 @@ function sanitizeCategory($category)
 
 function checkPdfPageCount($pdf_path, $expected_pages)
 {
-    $imagick = new Imagick();
-    try {
-        // Use pingImage to get the number of pages without loading all pages into memory
-        $imagick->pingImage($pdf_path);
-        $num_pages = $imagick->getNumberImages();
-
-        $imagick->clear();
-        $imagick->destroy();
-
-        if ($num_pages === $expected_pages) {
-            return true;
-        } else {
-            return false;
-        }
-    } catch (Exception $e) {
-        // Handle exception if needed
-        $imagick->clear();
-        $imagick->destroy();
+    // Parse the raw PDF to count pages — more reliable than Imagick's pingImage
+    // which misreports multi-page PDFs on some versions
+    $content = file_get_contents($pdf_path);
+    if ($content === false) {
         return false;
     }
+    $num_pages = preg_match_all('/\/Type\s*\/Page[^s]/', $content);
+    return $num_pages === $expected_pages;
 }
 
 function convertPdfToJpg($pdf_path, $folder_name, $original_filename, $categories, $dd_category, $dd_value)
