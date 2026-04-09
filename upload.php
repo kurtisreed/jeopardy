@@ -47,48 +47,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     // Check if file was uploaded without errors
     if (isset($_FILES['pdf_file']) && $_FILES['pdf_file']['error'] == 0) {
-        $allowed = ['pdf' => 'application/pdf'];
         $filename = $_FILES['pdf_file']['name'];
-        $filetype = $_FILES['pdf_file']['type'];
-
-        // Verify file extension
         $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-        if (!array_key_exists($ext, $allowed)) {
-            echo "Error: Please select a valid PDF file.";
+
+        if ($ext !== 'zip') {
+            echo "Error: Please upload a ZIP file created by the convert_pdf.py script.";
             exit;
         }
 
-        // Verify file type
-        if (in_array($filetype, $allowed)) {
-            // Specify the path to save the uploaded PDF
-            $upload_dir = 'uploads/';
-            if (!is_dir($upload_dir)) {
-                mkdir($upload_dir, 0755, true);
-            }
+        $upload_dir = 'uploads/';
+        if (!is_dir($upload_dir)) {
+            mkdir($upload_dir, 0755, true);
+        }
 
-            // Define the path where the PDF will be saved
-            $pdf_path = $upload_dir . basename($filename);
+        $zip_path = $upload_dir . basename($filename);
 
-            // Move the uploaded file to the server directory
-            if (move_uploaded_file($_FILES['pdf_file']['tmp_name'], $pdf_path)) {
-                echo "The file $filename has been uploaded successfully.<br>";
-
-                // Check if the PDF has exactly 53 pages before converting
-                if (checkPdfPageCount($pdf_path, 53)) {
-                    // Convert PDF to JPEG images with the specified folder name
-                    convertPdfToJpg($pdf_path, $folder_name, $filename, $categories, $dd_category, $dd_value);
-                } else {
-                    echo "Error: The PDF should have exactly 53 slides. Please use the provided Google docs template, and save as PDF.<br>";
-                    // Optionally, delete the uploaded PDF if it doesn't meet the criteria
-                    unlink($pdf_path);
-                    echo "Uploaded file has been deleted.";
-                }
-            } else {
-                echo "Error: There was a problem uploading your file.";
-                exit;
-            }
+        if (move_uploaded_file($_FILES['pdf_file']['tmp_name'], $zip_path)) {
+            echo "The file $filename has been uploaded successfully.<br>";
+            extractZipToGame($zip_path, $folder_name, $categories, $dd_category, $dd_value);
+            unlink($zip_path);
         } else {
-            echo "Error: Please upload a valid PDF file.";
+            echo "Error: There was a problem uploading your file.";
             exit;
         }
     } else {
@@ -126,73 +105,56 @@ function sanitizeCategory($category)
     return $category;
 }
 
-function checkPdfPageCount($pdf_path, $expected_pages)
+function extractZipToGame($zip_path, $folder_name, $categories, $dd_category, $dd_value)
 {
-    // Parse the raw PDF to count pages — more reliable than Imagick's pingImage
-    // which misreports multi-page PDFs on some versions
-    $content = file_get_contents($pdf_path);
-    if ($content === false) {
-        return false;
-    }
-    $num_pages = preg_match_all('/\/Type\s*\/Page[^s]/', $content);
-    return $num_pages === $expected_pages;
-}
-
-function convertPdfToJpg($pdf_path, $folder_name, $original_filename, $categories, $dd_category, $dd_value)
-{
-    // Specify the directory to save JPEG images
     $output_dir = 'Games/' . $folder_name . '/';
     if (!is_dir($output_dir)) {
         mkdir($output_dir, 0755, true);
     }
 
-    $imagick = new Imagick();
-    $imagick->setResolution(300, 300);
-
-    // Read the PDF into Imagick
-    try {
-        $imagick->readImage($pdf_path);
-    } catch (Exception $e) {
-        echo "Error: Could not read the PDF file.";
+    $zip = new ZipArchive();
+    if ($zip->open($zip_path) !== true) {
+        echo "Error: Could not open ZIP file.";
         return;
     }
 
-    // Get the number of pages
-    $num_pages = $imagick->getNumberImages();
-
-    // Initialize counter for pages converted
-    $pages_converted = 0;
-
-    for ($i = 0; $i < $num_pages; $i++) {
-        $imagick->setIteratorIndex($i);
-
-        $imagick->setImageFormat('jpeg');
-        $imagick->setImageCompressionQuality(90);
-
-        $image_filename = $output_dir . sprintf('%04d.jpg', $i + 1);
-
-        if ($imagick->writeImage($image_filename)) {
-            $pages_converted++;
-        } else {
-            // Handle error if needed
+    // Validate: must contain exactly 53 JPEGs named 0001.jpg–0053.jpg
+    $found = [];
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $name = basename($zip->getNameIndex($i));
+        if (preg_match('/^\d{4}\.jpg$/i', $name)) {
+            $found[] = $name;
         }
     }
 
-    $imagick->clear();
-    $imagick->destroy();
+    if (count($found) !== 53) {
+        echo "Error: ZIP should contain exactly 53 JPEG images, found " . count($found) . ". Please use the convert_pdf.py script to create the ZIP.";
+        $zip->close();
+        return;
+    }
 
-    // Create game.json file with full game configuration
+    // Extract only the JPEG files (ignore any extra files/folders in the zip)
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $name = $zip->getNameIndex($i);
+        $base = basename($name);
+        if (preg_match('/^\d{4}\.jpg$/i', $base)) {
+            $zip->extractTo($output_dir, $name);
+            // If zipped into a subfolder, move to output_dir root
+            if ($name !== $base && file_exists($output_dir . $name)) {
+                rename($output_dir . $name, $output_dir . $base);
+            }
+        }
+    }
+    $zip->close();
+
+    // Create game.json
     $game_config = generateGameConfig($folder_name, $categories, $dd_category, $dd_value);
     $game_json_file = $output_dir . 'game.json';
 
     if (file_put_contents($game_json_file, json_encode($game_config, JSON_PRETTY_PRINT)) !== false) {
-        // Also create categories.txt for backward compatibility
         $categories_file = $output_dir . 'categories.txt';
-        $categories_content = implode(PHP_EOL, $categories);
-        file_put_contents($categories_file, $categories_content);
-
-        // Output final statement
-        echo "Your new Jeopardy game $folder_name has been generated successfully.";
+        file_put_contents($categories_file, implode(PHP_EOL, $categories));
+        echo "Your new Jeopardy game \"$folder_name\" has been generated successfully.";
     } else {
         echo "Error: Failed to create game.json file.";
     }

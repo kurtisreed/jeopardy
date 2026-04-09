@@ -192,17 +192,17 @@
                         <a href="https://docs.google.com/presentation/d/129UQvMcNC24tdpssyEOOVbZu8l36fm7tFVinugeAG-w/edit?usp=sharing"
                            target="_blank"
                            style="color: var(--jeopardy-gold); text-decoration: underline;">
-                            Google Docs template
+                            Google Slides template
                         </a>.
-                        Fill in every slide and save as PDF.
+                        Fill in every slide, save as PDF, then run <code style="background:rgba(255,255,255,0.1); padding: 0.1rem 0.4rem; border-radius:4px;">convert_pdf.py</code> to produce the ZIP file to upload here.
                     </p>
                 </div>
 
                 <form id="uploadForm" enctype="multipart/form-data">
                     <div class="modal-body">
                         <div class="form-group">
-                            <label for="pdf_file">Select PDF File:</label>
-                            <input type="file" name="pdf_file" id="pdf_file" accept="application/pdf" required>
+                            <label for="pdf_file">Select ZIP File:</label>
+                            <input type="file" name="pdf_file" id="pdf_file" accept=".zip,application/zip" required>
                         </div>
 
                         <div class="form-group">
