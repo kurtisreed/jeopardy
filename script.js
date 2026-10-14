@@ -479,22 +479,26 @@ function showFJWinner() {
   document.getElementById('fj-results-section').style.display = 'block';
 
   const sorted = [...gameState.teams].sort((a, b) => b.score - a.score);
-  const winner = sorted[0];
+  const topScore = sorted[0].score;
+  const leaders = sorted.filter(t => t.score === topScore);
+  const isTie = leaders.length > 1;
 
   document.getElementById('fj-winner-display').innerHTML = `
     <div class="fj-winner-banner">
-      <div class="fj-winner-label">Winner!</div>
-      <div class="fj-winner-name">${winner.name}</div>
-      <div class="fj-winner-final-score">${winner.score} points</div>
+      <div class="fj-winner-label">${isTie ? "It's a Tie!" : 'Winner!'}</div>
+      <div class="fj-winner-name ${isTie ? 'fj-tie-names' : ''}">${leaders.map(t => t.name).join(' &amp; ')}</div>
+      <div class="fj-winner-final-score">${topScore} points${isTie ? ' each' : ''}</div>
     </div>
   `;
 
-  const medals = ['🥇', '🥈', '🥉', '4️⃣'];
+  // Teams with equal scores share a rank (and medal)
+  const medals = ['🥇', '🥈', '🥉'];
+  const ranks = sorted.map(team => sorted.findIndex(t => t.score === team.score));
   document.getElementById('fj-final-standings').innerHTML = `
     <h3 style="color:var(--text-secondary); margin-bottom:1rem; font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">Final Standings</h3>
     ${sorted.map((team, i) => `
-      <div class="fj-standing-row ${i === 0 ? 'fj-standing-first' : ''}">
-        <span class="fj-standing-medal">${medals[i] || ''}</span>
+      <div class="fj-standing-row ${ranks[i] === 0 ? 'fj-standing-first' : ''}">
+        <span class="fj-standing-medal">${medals[ranks[i]] || ''}</span>
         <span class="fj-standing-name">${team.name}</span>
         <span class="fj-standing-score">${team.score}</span>
       </div>

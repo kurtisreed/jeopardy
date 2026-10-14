@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a web-based Jeopardy game application built with vanilla JavaScript, HTML, CSS, and PHP. It allows users to host interactive Jeopardy games by uploading PDF game files or selecting from previously created games. The application manages team scoring, displays questions/answers as images, and handles special Jeopardy features like Daily Double and Final Jeopardy.
+This is a web-based Jeopardy game application built with vanilla JavaScript, HTML, CSS, and PHP. It allows users to host interactive Jeopardy games by uploading PDF (or pre-converted ZIP) game files or selecting from previously created games. The application manages team scoring, displays questions/answers as images, and handles special Jeopardy features like Daily Double and Final Jeopardy.
 
 ## Architecture
 
@@ -22,11 +22,13 @@ This is a web-based Jeopardy game application built with vanilla JavaScript, HTM
   - Score editing modal (`changescore`) - manual score adjustments
   - Opening modal (`openingmodal`) - game setup and configuration
   - Upload modal (`uploadModal`) - new game creation with DD location selector
+- **Client-side PDF conversion**: `convertPdfToZip()` uses PDF.js (3.11.174) to render each PDF page at 300 DPI to a JPEG and JSZip to bundle them; `handleUploadFormSubmit()` runs this (with a progress bar) then POSTs the ZIP to `upload.php`. If the user selects a `.zip` directly, it is uploaded as-is. PDF.js and JSZip load from cdnjs in `index.html`.
 - **Image-based gameplay**: Questions and answers are JPEG images loaded from `./Games/{folderName}/` directories
 - **Dynamic team support**: UI automatically adjusts for 2 or 3 teams by removing elements with `.remove` class
 
 ### Backend (PHP)
-- **upload.php**: Processes PDF uploads, validates 53-page requirement, converts to JPEGs using ImageMagick
+- **upload.php**: Receives a ZIP of 53 JPEGs (no server-side PDF/Imagick conversion), validates the count, extracts to `./Games/{name}/`, and generates `game.json` and `categories.txt`. Uses PHP `ZipArchive`.
+- **convert_pdf.py**: Optional local PyMuPDF script that converts a 53-page PDF to an upload-ready ZIP (faster backup to the in-browser conversion)
 - **save_categories.php**: Saves category names to `categories.txt` in game folders
 - **subfolders.php**: Dynamically generates dropdown of available games from `./Games/` directory
 - **authenticate.php**: Simple PIN-based authentication (PIN: 1640 hardcoded in file)
@@ -106,7 +108,7 @@ The primary game configuration file with complete metadata:
 **Special Behaviors:**
 - Clicking a `.point` div marks it with `.used` class to track answered questions
 - Team 3 removal: If `#openingteam3` is empty on form submit, all `.remove` elements are deleted and `gameState.teams` is reduced to 2 teams
-- Daily Double is hardcoded to the 4th column, 4th row (400 point value in category 4)
+- Daily Double defaults to category 4, $400 (legacy games without game.json) but is configurable per game via game.json
 
 ## Development Notes
 
@@ -119,7 +121,7 @@ There is no automated test suite. Manual testing involves:
 5. Verifying score tracking for 2 and 3 team configurations
 
 ### Running the Application
-This requires a PHP-enabled web server with ImageMagick PHP extension:
+This requires a PHP-enabled web server with the `zip` extension (`ZipArchive`). ImageMagick is no longer needed. The project is typically served from XAMPP's `htdocs`.
 ```bash
 php -S localhost:8000
 ```
@@ -133,12 +135,16 @@ Then navigate to `http://localhost:8000/index.html`
    - Enter game name
    - Enter all 5 category names
    - **Select Daily Double location** (category and point value dropdowns)
-   - Upload PDF file
-5. The PHP backend:
-   - Validates 53-page requirement
-   - Converts PDF pages to numbered JPEGs using ImageMagick
+   - Select the PDF file (or a ZIP made with `convert_pdf.py`)
+5. In the browser (PDF only): `convertPdfToZip()` checks for exactly 53 pages, renders each to a 300 DPI JPEG (quality 0.90) named `0001.jpg`...`0053.jpg`, and zips them
+6. The PHP backend (`extractZipToGame()`):
+   - Rejects non-ZIP uploads and ZIPs that don't contain exactly 53 JPEGs
+   - Extracts the images into `./Games/{name}/` (flattening any subfolder in the ZIP)
    - Generates game.json with custom DD location
    - Creates categories.txt for backward compatibility
+7. On success the upload modal swaps the submit button for "Return to Main Screen" (`returnToOpening()`)
+
+Alternative: run `python3 convert_pdf.py game.pdf` locally (requires PyMuPDF) and upload the resulting ZIP.
 
 ### Migrating Existing Games to game.json
 For games created before the game.json system:
@@ -151,15 +157,15 @@ For games created before the game.json system:
    - Provide a summary report
 
 ### Important Constraints
-- PDF uploads MUST have exactly 53 pages (validated in `checkPdfPageCount()`)
+- Uploads MUST contain exactly 53 pages/images (PDF page count checked client-side in `convertPdfToZip()`; JPEG count checked server-side in `extractZipToGame()`)
 - Daily Double location is **fully configurable**:
   - Selected during PDF upload via dropdown in upload modal
   - Stored in game.json configuration file
   - Board is dynamically generated with DD in correct location
   - No manual HTML editing required
 - Authentication PIN is hardcoded in `authenticate.php:5`
-- Image resolution set to 300 DPI in `upload.php:148`
-- Maximum folder name length: 50 characters (sanitized in `upload.php:100`)
+- Image resolution set to 300 DPI in `convertPdfToZip()` (`SCALE = 300 / 72`) and in `convert_pdf.py`
+- Maximum folder name length: 50 characters (`sanitizeFolderName()` in `upload.php`)
 - Game config system is **backward compatible**: Falls back to categories.txt and legacy board generation if game.json missing
 
 ### Common Issues
@@ -170,5 +176,6 @@ For games created before the game.json system:
   - Verify game.json was loaded (check browser console for "Loaded game config" message)
 - If categories don't appear, check that either game.json or categories.txt exists in the game folder
 - If team 3 UI elements persist when only 2 teams are specified, ensure the team name input is completely empty (not just whitespace)
-- ImageMagick must be installed and the PHP `imagick` extension enabled for PDF uploads to work
+- Uploads fail with a PDF.js error if the PDF isn't 53 pages, or a server error if the ZIP doesn't contain 53 JPEGs; check the PHP `zip` extension is enabled and `post_max_size`/`upload_max_filesize` fit the ZIP (300 DPI JPEGs are large)
+- PDF.js/JSZip load from cdnjs, so PDF upload needs internet access
 - For debugging: Open browser console to see which config system is being used (game.json or categories.txt fallback)
