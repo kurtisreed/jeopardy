@@ -440,6 +440,14 @@ function showAnswer(event) {
   }
 }
 
+// Nobody got the clue: no score change, but record it so it can be undone
+// (undo re-opens the clue tile).
+function noPoints(event) {
+  event.stopPropagation();
+  pushUndo(`No points (${document.getElementById('title').textContent})`, currentCellId);
+  document.getElementById('modal01').style.display = 'none';
+}
+
 function showAnswerForDD(event) {
     DDslide.src = DDslide.dataset.nextslide;
     event.stopPropagation();
