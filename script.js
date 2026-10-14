@@ -11,7 +11,57 @@ const gameState = {
   ],
   activeTeamCount: 3, // Will be set based on user selection
   usedCells: [],      // Tracks which board cells have been answered
+  controlTeamId: null, // Team that currently has control of the board (picks next clue)
 };
+
+// Undo history for scoring. Each entry snapshots scores + control (and the clue
+// cell that was awarded, so undoing lets the host re-open it and credit again).
+const undoStack = [];
+const UNDO_LIMIT = 20;
+let ddPrevControlId = null; // Who had control before the Daily Double team was chosen
+let currentCellId = null; // Board cell of the clue currently open
+
+function pushUndo(label, cellId = null) {
+  undoStack.push({
+    label,
+    scores: gameState.teams.map(t => ({ id: t.id, score: t.score })),
+    controlTeamId: gameState.controlTeamId,
+    cellId,
+  });
+  if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+  updateUndoButton();
+}
+
+function clearUndo() {
+  undoStack.length = 0;
+  updateUndoButton();
+}
+
+function undoLastScore() {
+  const entry = undoStack.pop();
+  if (!entry) return;
+  entry.scores.forEach(({ id, score }) => {
+    const team = gameState.teams.find(t => t.id === id);
+    if (team) team.score = score;
+  });
+  gameState.controlTeamId = entry.controlTeamId;
+  if (entry.cellId) {
+    gameState.usedCells = gameState.usedCells.filter(c => c !== entry.cellId);
+    const cell = document.getElementById(entry.cellId);
+    if (cell) cell.classList.remove('used');
+  }
+  updateTeamUI();
+  saveGameState();
+  updateUndoButton();
+}
+
+function updateUndoButton() {
+  const btn = document.getElementById('undo-btn');
+  if (!btn) return;
+  const last = undoStack[undoStack.length - 1];
+  btn.disabled = !last;
+  btn.textContent = last ? `Undo: ${last.label}` : 'Undo';
+}
 
 // Game State Persistence
 function saveGameState() {
@@ -20,6 +70,7 @@ function saveGameState() {
     teams: gameState.teams.map(t => ({ ...t })),
     activeTeamCount: gameState.activeTeamCount,
     usedCells: gameState.usedCells,
+    controlTeamId: gameState.controlTeamId,
     timestamp: Date.now(),
   };
   localStorage.setItem('jeopardyGameState', JSON.stringify(stateToSave));
@@ -61,6 +112,8 @@ async function resumeGame() {
     gameState.teams = state.teams;
     gameState.activeTeamCount = state.activeTeamCount;
     gameState.usedCells = state.usedCells || [];
+    gameState.controlTeamId = state.controlTeamId || null;
+    clearUndo();
     document.getElementById('openingmodal').style.display = 'none';
     await loadGameConfig(selectedFolderName);
     generateBoard();
@@ -116,6 +169,8 @@ function handleOpeningFormSubmit(event) {
   // Trim the teams array to only include active teams
   gameState.teams = gameState.teams.slice(0, teamCount);
   gameState.usedCells = []; // Reset used cells for new game
+  gameState.controlTeamId = null;
+  clearUndo();
 
   console.log(`Game configured for ${teamCount} teams:`, gameState.teams);
 
@@ -133,6 +188,11 @@ function handleNewScoreFormSubmit(event) {
   event.preventDefault();
 
   // Read scores from dynamically generated inputs
+  const edited = gameState.teams.some(team => {
+    const input = document.getElementById(`new${team.id.slice(-1)}score`);
+    return input && Number(input.value) !== team.score;
+  });
+  if (edited) pushUndo('manual score edit');
   gameState.teams.forEach((team, index) => {
     const input = document.getElementById(`new${team.id.slice(-1)}score`);
     if (input) {
@@ -166,7 +226,10 @@ function updateTeamUI() {
 
     // Only update if elements exist (board has been generated)
     if (nameElement) nameElement.textContent = team.name;
-    if (scoreElement) scoreElement.textContent = team.score;
+    if (scoreElement) {
+      scoreElement.textContent = team.score;
+      scoreElement.classList.toggle('has-control', team.id === gameState.controlTeamId);
+    }
   });
 
   // Update score modal team names
@@ -176,6 +239,14 @@ function updateTeamUI() {
       modalElement.textContent = `${team.name} score:`;
     }
   });
+}
+
+// Control of the board: the team that last answered correctly (or the Daily Double
+// team) picks the next clue. The host can also set it by clicking a team's name.
+function setControl(teamId) {
+  gameState.controlTeamId = teamId;
+  updateTeamUI();
+  saveGameState();
 }
 
 function generateModalTeamButtons() {
@@ -281,6 +352,8 @@ function showDDQuestion(teamIndex) {
     const picPath = `./Games/${selectedFolderName}/${ddConfig.questionImage}`;
     const nextPicPath = `./Games/${selectedFolderName}/${ddConfig.answerImage}`;
     dailyDoubleTeamIndex = teamIndex;
+    ddPrevControlId = gameState.controlTeamId;
+    setControl(gameState.teams[teamIndex].id); // DD team keeps control whether right or wrong
     dailyDoubleBid = Number(document.getElementById('ddamount').value);
 
     const thisTeam = gameState.teams[teamIndex].name;
@@ -300,6 +373,8 @@ function showDDQuestion(teamIndex) {
 function DDAnswer(isCorrect) {
     // Add or subtract the bid from the current team's score
     if (dailyDoubleTeamIndex !== null) {
+        pushUndo(`${gameState.teams[dailyDoubleTeamIndex].name} Daily Double ${isCorrect ? '+' : '-'}${dailyDoubleBid}`, currentCellId);
+        undoStack[undoStack.length - 1].controlTeamId = ddPrevControlId; // undo should also restore who had control before the DD
         if (isCorrect) {
             gameState.teams[dailyDoubleTeamIndex].score += dailyDoubleBid;
         } else {
@@ -673,7 +748,7 @@ function generateLegacyBoard() {
       const team = gameState.teams[rowIndex];
       const teamCell = document.createElement('div');
       teamCell.className = 'cell misctest';
-      teamCell.innerHTML = `<div><span id="${team.id}name">${team.name}</span><br><span class="scorearea" id="${team.id}score" onclick="openScoreModal()">${team.score}</span></div>`;
+      teamCell.innerHTML = `<div><span class="teamname" id="${team.id}name" title="Click to give this team control of the board" onclick="setControl('${team.id}')">${team.name}</span><br><span class="scorearea" id="${team.id}score" onclick="openScoreModal()">${team.score}</span></div>`;
       grid.appendChild(teamCell);
     } else {
       // Empty cell or Final Jeopardy button
@@ -710,6 +785,7 @@ function generateLegacyBoard() {
       if (colIndex === 3 && pointValue === 400) {
         cellDiv.onclick = function() {
           this.classList.add('used');
+          currentCellId = cellId;
           if (!gameState.usedCells.includes(cellId)) gameState.usedCells.push(cellId);
           saveGameState();
           showDDSplash();
@@ -717,6 +793,7 @@ function generateLegacyBoard() {
       } else {
         cellDiv.onclick = function() {
           this.classList.add('used');
+          currentCellId = cellId;
           if (!gameState.usedCells.includes(cellId)) gameState.usedCells.push(cellId);
           saveGameState();
           openModal(pointValue, questionImage, answerImage);
@@ -776,7 +853,7 @@ function generateBoard() {
       const team = gameState.teams[rowIndex];
       const teamCell = document.createElement('div');
       teamCell.className = 'cell misctest';
-      teamCell.innerHTML = `<div><span id="${team.id}name">${team.name}</span><br><span class="scorearea" id="${team.id}score" onclick="openScoreModal()">${team.score}</span></div>`;
+      teamCell.innerHTML = `<div><span class="teamname" id="${team.id}name" title="Click to give this team control of the board" onclick="setControl('${team.id}')">${team.name}</span><br><span class="scorearea" id="${team.id}score" onclick="openScoreModal()">${team.score}</span></div>`;
       grid.appendChild(teamCell);
     } else {
       // Empty cell or Final Jeopardy button
@@ -819,6 +896,7 @@ function generateBoard() {
       if (category === ddCategory && pointValue === ddValue) {
         cellDiv.onclick = function() {
           this.classList.add('used');
+          currentCellId = cellId;
           if (!gameState.usedCells.includes(cellId)) gameState.usedCells.push(cellId);
           saveGameState();
           showDDSplash();
@@ -826,6 +904,7 @@ function generateBoard() {
       } else {
         cellDiv.onclick = function() {
           this.classList.add('used');
+          currentCellId = cellId;
           if (!gameState.usedCells.includes(cellId)) gameState.usedCells.push(cellId);
           saveGameState();
           openModal(pointValue, questionData.question, questionData.answer);
@@ -1049,7 +1128,9 @@ function returnToOpening() {
 function addPoints(teamId, points) {
   const team = gameState.teams.find((t) => t.id === teamId);
   if (team) {
+    pushUndo(`${team.name} +${Number(points)}`, currentCellId);
     team.score += Number(points);
+    gameState.controlTeamId = team.id; // correct answer takes control of the board
     updateTeamUI();
     saveGameState();
   } else {
