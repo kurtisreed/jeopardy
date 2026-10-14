@@ -1,9 +1,19 @@
 <?php
+require_once __DIR__ . '/auth.php';
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    require_auth();
     $data = json_decode(file_get_contents('php://input'), true);
 
     if (isset($data['folder']) && isset($data['categories'])) {
-        $folder = $data['folder'];
+        // Only ever write inside ./Games/{name}: ignore any path components the client sends
+        $folderName = basename(str_replace('\\', '/', (string) $data['folder']));
+        if ($folderName === '' || $folderName === '.' || $folderName === '..') {
+            http_response_code(400);
+            echo 'Invalid folder.';
+            exit;
+        }
+        $folder = __DIR__ . '/Games/' . $folderName;
         $categories = $data['categories'];
 
         // Ensure the directory exists

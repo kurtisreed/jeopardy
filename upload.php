@@ -4,7 +4,11 @@ ini_set('max_execution_time', 300);
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
+require_once __DIR__ . '/auth.php';
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    require_auth();
+
     // Buffer output to prevent any unintended output
     ob_start();
 

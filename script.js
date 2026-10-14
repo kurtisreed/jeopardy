@@ -1096,6 +1096,7 @@ async function handleUploadFormSubmit(event) {
     }
 
     const response = await fetch('upload.php', { method: 'POST', body: formData });
+    if (response.status === 401) throw new Error('Your session expired. Reload the page and enter the PIN again.');
     if (!response.ok) throw new Error(`Server error: ${response.status}`);
     const data = await response.text();
 
@@ -1168,7 +1169,7 @@ document.addEventListener('DOMContentLoaded', () => {
           appContent.style.display = 'block';
           document.getElementById('auth-container').style.display = 'none';
         } else {
-          authMessage.textContent = 'Invalid PIN. Please try again.';
+          authMessage.textContent = data.message || 'Invalid PIN. Please try again.';
         }
       })
       .catch((error) => console.error('Error:', error));

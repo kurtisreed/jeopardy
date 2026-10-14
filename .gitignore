@@ -21,3 +21,6 @@ desktop.ini
 *.tmp
 *.bak
 *.log
+
+# Server secrets (see config.example.php)
+config.php

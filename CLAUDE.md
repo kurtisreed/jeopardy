@@ -31,7 +31,8 @@ This is a web-based Jeopardy game application built with vanilla JavaScript, HTM
 - **convert_pdf.py**: Optional local PyMuPDF script that converts a 53-page PDF to an upload-ready ZIP (faster backup to the in-browser conversion)
 - **save_categories.php**: Saves category names to `categories.txt` in game folders
 - **subfolders.php**: Dynamically generates dropdown of available games from `./Games/` directory
-- **authenticate.php**: Simple PIN-based authentication (PIN: 1640 hardcoded in file)
+- **authenticate.php**: Verifies the PIN against the bcrypt hash in `config.php` (git-ignored; copy `config.example.php` and set `pin_hash`), starts a session, and rate-limits guesses per IP (5 failures = 15 min lockout)
+- **auth.php**: Shared helpers (`require_auth()`, session settings, lockout tracking). `upload.php`, `save_categories.php`, and `generate_game_configs.php` (browser access) all call `require_auth()` and return 401 without a valid login session (8 hours)
 
 ### File Structure Convention
 Each game in `./Games/{gameName}/` contains:
@@ -163,7 +164,8 @@ For games created before the game.json system:
   - Stored in game.json configuration file
   - Board is dynamically generated with DD in correct location
   - No manual HTML editing required
-- Authentication PIN is hardcoded in `authenticate.php:5`
+- Authentication PIN is stored only as a hash in `config.php` (not in git). `config.php` must be created on every server, or login fails with a "Server not configured" message. To change the PIN: `php -r 'echo password_hash("NEW-PIN", PASSWORD_DEFAULT);'` and paste into `config.php`
+- `subfolders.php` and the `Games/` images are still publicly readable; only the write endpoints are protected
 - Image resolution set to 300 DPI in `convertPdfToZip()` (`SCALE = 300 / 72`) and in `convert_pdf.py`
 - Maximum folder name length: 50 characters (`sanitizeFolderName()` in `upload.php`)
 - Game config system is **backward compatible**: Falls back to categories.txt and legacy board generation if game.json missing

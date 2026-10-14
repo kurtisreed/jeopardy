@@ -7,6 +7,11 @@
  * Or access via browser: http://localhost:8000/generate_game_configs.php
  */
 
+require_once __DIR__ . '/auth.php';
+if (PHP_SAPI !== 'cli') {
+    require_auth();
+}
+
 function generateGameConfig($folder_name, $categories, $dd_category = 4, $dd_value = 400)
 {
     // Calculate Daily Double image numbers based on category and value
